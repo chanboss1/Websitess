@@ -1,0 +1,930 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Dynamic Code & Website Preview Tool</title>
+
+<!-- Prism.js Dark Syntax Highlighting Theme -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-css.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-markup.min.js"></script>
+
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; font-family: -apple-system, sans-serif; }
+  
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background: #0a0e1a;
+    color: #f5f3ee;
+    user-select: none;
+    touch-action: pan-x pan-y;
+    overscroll-behavior: contain;
+  }
+
+  .app-container {
+    display: inline-block;
+    min-width: 100vw;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  /* Main Sticky Toolbar Bar - Made Directly Scrollable */
+  .toolbar {
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 1000;
+    background: rgba(18, 25, 43, 0.95);
+    backdrop-filter: blur(8px);
+    border: 1px solid #2a3348;
+    padding: 12px 16px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior: contain;
+    touch-action: pan-x;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #2ec4b6 #0a0e1a;
+  }
+
+  /* Mode Switcher */
+  .mode-switch {
+    display: flex;
+    gap: 4px;
+    background: #0a0e1a;
+    padding: 3px;
+    border-radius: 6px;
+    border: 1px solid #2a3348;
+    flex-shrink: 0;
+  }
+
+  .mode-btn {
+    background: transparent;
+    color: #9099ad;
+    border: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .mode-btn.active {
+    background: #1a233a;
+    color: #2ec4b6;
+    font-weight: bold;
+  }
+
+  .input-panel {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .url-input-container {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #0a0e1a;
+    border: 1px solid #2a3348;
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+
+  .url-input-container input {
+    background: transparent;
+    border: none;
+    color: #2ec4b6;
+    font-size: 0.85rem;
+    outline: none;
+    width: 200px;
+  }
+
+  /* Code Boxes Wrapper Inside Toolbar */
+  .code-boxes-container {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-shrink: 0;
+  }
+
+  .code-box {
+    display: flex;
+    flex-direction: column;
+    background: #0d1117;
+    border: 1px solid #2a3348;
+    border-radius: 6px;
+    padding: 6px;
+    position: relative;
+    width: 240px;
+    flex-shrink: 0;
+  }
+
+  .code-box-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+    gap: 6px;
+  }
+
+  .code-box label {
+    font-size: 0.7rem;
+    color: #2ec4b6;
+    font-weight: bold;
+  }
+
+  .box-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .box-btn {
+    background: #1a233a;
+    border: 1px solid #2a3348;
+    color: #9099ad;
+    font-size: 0.65rem;
+    padding: 2px 5px;
+    border-radius: 3px;
+    cursor: pointer;
+  }
+
+  .box-btn:hover {
+    color: #2ec4b6;
+    border-color: #2ec4b6;
+  }
+
+  .remove-box-btn {
+    background: transparent;
+    border: none;
+    color: #e74c3c;
+    font-size: 0.85rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 2px;
+    margin-left: 2px;
+  }
+
+  /* Syntax Highlighted Editor Stack */
+  .editor-wrapper {
+    position: relative;
+    width: 100%;
+    height: 90px;
+    background: #161b22;
+    border-radius: 4px;
+    border: 1px solid #30363d;
+    overflow: hidden;
+  }
+
+  .editor-wrapper textarea,
+  .editor-wrapper pre {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 8px;
+    border: 0;
+    margin: 0;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
+    font-size: 0.75rem !important;
+    line-height: 1.3 !important;
+    white-space: pre !important;
+    word-wrap: normal !important;
+    overflow: auto !important;
+    tab-size: 2;
+    overscroll-behavior: contain;
+    touch-action: pan-x pan-y;
+  }
+
+  .editor-wrapper textarea {
+    z-index: 2;
+    color: transparent !important;
+    background: transparent !important;
+    caret-color: #2ec4b6 !important;
+    outline: none;
+    resize: none;
+  }
+
+  .editor-wrapper pre {
+    z-index: 1;
+    pointer-events: none;
+    background: transparent !important;
+  }
+
+  .editor-wrapper code {
+    font-family: inherit !important;
+    font-size: inherit !important;
+    background: transparent !important;
+  }
+
+  /* Add Box Dropdown */
+  .add-dropdown {
+    position: relative;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+
+  .add-btn {
+    background: #1a233a;
+    color: #2ec4b6;
+    border: 1px solid #2ec4b6;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  .dropdown-content {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: #12192b;
+    border: 1px solid #2a3348;
+    border-radius: 6px;
+    min-width: 150px;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+    z-index: 1001;
+  }
+
+  .dropdown-content.show { display: block; }
+
+  .dropdown-content button {
+    width: 100%;
+    background: transparent;
+    color: #f5f3ee;
+    border: none;
+    padding: 8px 12px;
+    text-align: left;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+
+  .dropdown-content button:hover {
+    background: #1a233a;
+    color: #2ec4b6;
+  }
+
+  .action-btn {
+    background: #2ec4b6;
+    color: #0a0e1a;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    align-self: center;
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+
+  .presets {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .presets button {
+    background: #1a233a;
+    color: #f5f3ee;
+    border: 1px solid #2a3348;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .dimension-inputs {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: #0a0e1a;
+    border: 1px solid #2a3348;
+    padding: 4px 10px;
+    border-radius: 6px;
+    flex-shrink: 0;
+  }
+
+  .dimension-inputs label {
+    font-size: 0.8rem;
+    color: #9099ad;
+  }
+
+  .dimension-inputs input {
+    width: 55px;
+    background: transparent;
+    border: none;
+    border-bottom: 1px solid #2ec4b6;
+    color: #2ec4b6;
+    font-family: monospace;
+    font-size: 0.85rem;
+    text-align: center;
+    outline: none;
+  }
+
+  .zoom-indicator {
+    font-size: 0.8rem;
+    color: #2ec4b6;
+    background: #0a0e1a;
+    border: 1px solid #2a3348;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-family: monospace;
+    flex-shrink: 0;
+  }
+
+  /* Workspace */
+  .workspace {
+    display: inline-block;
+    position: relative;
+    padding-right: 200px;
+    padding-bottom: 200px;
+  }
+
+  .preview-frame-wrapper {
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+
+  .preview-frame {
+    position: relative;
+    width: 375px;
+    height: 667px;
+    background: #fff;
+    border: 2px solid #2a3348;
+    border-radius: 12px;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    will-change: width, height;
+  }
+
+  .preview-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    border-radius: 10px;
+    background: white;
+  }
+
+  .drag-overlay {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    background: transparent;
+  }
+
+  .resize-handle {
+    position: absolute;
+    bottom: -10px;
+    right: -10px;
+    width: 35px;
+    height: 35px;
+    cursor: nwse-resize;
+    z-index: 20;
+    touch-action: none;
+  }
+
+  .resize-handle::before {
+    content: '';
+    position: absolute;
+    bottom: 12px;
+    right: 12px;
+    width: 14px;
+    height: 14px;
+    border-right: 3px solid #2ec4b6;
+    border-bottom: 3px solid #2ec4b6;
+    border-radius: 0 0 3px 0;
+  }
+</style>
+</head>
+<body>
+
+<div class="app-container">
+  <!-- Sticky Toolbar Bar Directly Acts as the Horizontal Scroll Container -->
+  <div class="toolbar" id="toolbar">
+    <!-- Mode Switcher -->
+    <div class="mode-switch">
+      <button class="mode-btn active" id="modeUrlBtn">URL Mode</button>
+      <button class="mode-btn" id="modeCodeBtn">Code Mode</button>
+    </div>
+
+    <!-- URL Panel -->
+    <div class="input-panel" id="urlPanel">
+      <div class="url-input-container">
+        <input type="text" id="targetUrl" placeholder="https://example.com" value="https://example.com">
+      </div>
+      <button class="action-btn" id="loadUrlBtn">Load URL</button>
+    </div>
+
+    <!-- Dynamic Code Panel -->
+    <div class="input-panel" id="codePanel" style="display: none;">
+      <div class="add-dropdown">
+        <button class="add-btn" id="addMenuBtn">+ Add Box</button>
+        <div class="dropdown-content" id="addDropdownContent">
+          <button data-type="html">HTML Only</button>
+          <button data-type="css">CSS Only</button>
+          <button data-type="js">JS Only</button>
+          <button data-type="html-js">HTML + JS</button>
+          <button data-type="html-css">HTML + CSS</button>
+          <button data-type="css-js">CSS + JS</button>
+          <button data-type="full">HTML + CSS + JS</button>
+        </div>
+      </div>
+
+      <div class="code-boxes-container" id="codeBoxesContainer"></div>
+
+      <button class="action-btn" id="renderCodeBtn">Render Code</button>
+    </div>
+
+    <!-- Presets -->
+    <div class="presets">
+      <button data-w="375" data-h="667">Mobile</button>
+      <button data-w="768" data-h="1024">Tablet</button>
+      <button data-w="1280" data-h="800">Desktop</button>
+      <button data-w="1920" data-h="1080">FHD</button>
+    </div>
+
+    <!-- Dimensions -->
+    <div class="dimension-inputs">
+      <label for="inputWidth">W:</label>
+      <input type="number" id="inputWidth" value="375" min="100">
+      <span>×</span>
+      <label for="inputHeight">H:</label>
+      <input type="number" id="inputHeight" value="667" min="100">
+      <label>px</label>
+    </div>
+
+    <!-- Zoom Display -->
+    <div class="zoom-indicator" id="zoomVal">100%</div>
+  </div>
+
+  <!-- Resizable Frame Workspace -->
+  <div class="workspace">
+    <div class="preview-frame-wrapper" id="frameWrapper">
+      <div class="preview-frame" id="previewFrame">
+        <iframe id="previewIframe"></iframe>
+        <div class="drag-overlay" id="overlay"></div>
+        <div class="resize-handle" id="handle"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const toolbar = document.getElementById('toolbar');
+  const frame = document.getElementById('previewFrame');
+  const frameWrapper = document.getElementById('frameWrapper');
+  const iframe = document.getElementById('previewIframe');
+  const handle = document.getElementById('handle');
+  const overlay = document.getElementById('overlay');
+  const inputWidth = document.getElementById('inputWidth');
+  const inputHeight = document.getElementById('inputHeight');
+  const zoomVal = document.getElementById('zoomVal');
+  const presets = document.querySelectorAll('.presets button');
+
+  const modeUrlBtn = document.getElementById('modeUrlBtn');
+  const modeCodeBtn = document.getElementById('modeCodeBtn');
+  const urlPanel = document.getElementById('urlPanel');
+  const codePanel = document.getElementById('codePanel');
+  const targetUrl = document.getElementById('targetUrl');
+  const loadUrlBtn = document.getElementById('loadUrlBtn');
+  const renderCodeBtn = document.getElementById('renderCodeBtn');
+
+  const addMenuBtn = document.getElementById('addMenuBtn');
+  const addDropdownContent = document.getElementById('addDropdownContent');
+  const codeBoxesContainer = document.getElementById('codeBoxesContainer');
+
+  let activeMode = 'url';
+  let currentZoom = 1;
+
+  function setZoom(scale, originX = 0, originY = 0) {
+    currentZoom = Math.max(0.001, scale);
+    
+    if (originX !== 0 || originY !== 0) {
+      frameWrapper.style.transformOrigin = `${originX}px ${originY}px`;
+    }
+    
+    frameWrapper.style.transform = `scale(${currentZoom})`;
+    zoomVal.innerText = `${Math.round(currentZoom * 100)}%`;
+  }
+
+  // --- INFINITE 2-FINGER TOUCH PINCH TO ZOOM ANYWHERE ---
+  let touchStartDist = 0;
+  let startZoom = 1;
+
+  function getTouchDistance(touches) {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.hypot(dx, dy);
+  }
+
+  function getTouchMidpoint(touches) {
+    const rect = frameWrapper.getBoundingClientRect();
+    const midX = (touches[0].clientX + touches[1].clientX) / 2 - rect.left;
+    const midY = (touches[0].clientY + touches[1].clientY) / 2 - rect.top;
+    return { x: midX, y: midY };
+  }
+
+  window.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      touchStartDist = getTouchDistance(e.touches);
+      startZoom = currentZoom;
+    }
+  }, { passive: false });
+
+  window.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const newDist = getTouchDistance(e.touches);
+      if (touchStartDist > 0) {
+        const mid = getTouchMidpoint(e.touches);
+        const scaleFactor = newDist / touchStartDist;
+        setZoom(startZoom * scaleFactor, mid.x, mid.y);
+      }
+    }
+  }, { passive: false });
+
+  window.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) {
+      touchStartDist = 0;
+    }
+  });
+
+  // --- TRACKPAD PINCH & CTRL + WHEEL INFINITE ZOOM ---
+  window.addEventListener('wheel', (e) => {
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+      
+      const rect = frameWrapper.getBoundingClientRect();
+      const originX = e.clientX - rect.left;
+      const originY = e.clientY - rect.top;
+      
+      setZoom(currentZoom * zoomFactor, originX, originY);
+    }
+  }, { passive: false });
+
+  // --- TOUCH & MOUSE SWIPE / SCROLL ENGINE FOR TOOLBAR ---
+  let isBarDragging = false;
+  let startBarX = 0;
+  let barScrollLeft = 0;
+
+  toolbar.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 1 && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'INPUT') {
+      isBarDragging = true;
+      startBarX = e.touches[0].clientX;
+      barScrollLeft = toolbar.scrollLeft;
+    }
+  }, { passive: true });
+
+  toolbar.addEventListener('touchmove', (e) => {
+    if (isBarDragging && e.touches.length === 1) {
+      const deltaX = e.touches[0].clientX - startBarX;
+      toolbar.scrollLeft = barScrollLeft - deltaX;
+      e.stopPropagation();
+    }
+  }, { passive: true });
+
+  toolbar.addEventListener('touchend', () => { isBarDragging = false; });
+
+  toolbar.addEventListener('mousedown', (e) => {
+    if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'BUTTON' || e.target.tagName === 'INPUT') return;
+    isBarDragging = true;
+    startBarX = e.clientX;
+    barScrollLeft = toolbar.scrollLeft;
+  });
+
+  window.addEventListener('mouseup', () => { isBarDragging = false; });
+  window.addEventListener('mousemove', (e) => {
+    if (!isBarDragging) return;
+    const deltaX = e.clientX - startBarX;
+    toolbar.scrollLeft = barScrollLeft - deltaX;
+  });
+
+  function getPrismClass(type) {
+    if (type === 'css') return 'language-css';
+    if (type === 'js') return 'language-javascript';
+    return 'language-markup';
+  }
+
+  function saveState() {
+    const boxesData = [];
+    const boxes = codeBoxesContainer.querySelectorAll('.code-box');
+    boxes.forEach(box => {
+      boxesData.push({
+        type: box.dataset.type,
+        label: box.querySelector('label').innerText,
+        value: box.querySelector('textarea').value
+      });
+    });
+
+    const state = {
+      mode: activeMode,
+      url: targetUrl.value,
+      width: frame.offsetWidth,
+      height: frame.offsetHeight,
+      zoom: currentZoom,
+      boxes: boxesData
+    };
+
+    localStorage.setItem('previewer_prism_state', JSON.stringify(state));
+  }
+
+  function loadState() {
+    const saved = localStorage.getItem('previewer_prism_state');
+    if (!saved) return false;
+
+    try {
+      const state = JSON.parse(saved);
+
+      if (state.width && state.height) {
+        frame.style.width = state.width + 'px';
+        frame.style.height = state.height + 'px';
+      }
+
+      if (state.zoom) setZoom(state.zoom);
+      if (state.url) targetUrl.value = state.url;
+
+      if (state.boxes && state.boxes.length > 0) {
+        codeBoxesContainer.innerHTML = '';
+        state.boxes.forEach(b => {
+          createCodeBox(b.type, b.label, b.value);
+        });
+      }
+
+      if (state.mode === 'code') switchMode('code');
+      else switchMode('url');
+
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function switchMode(mode) {
+    activeMode = mode;
+    if (mode === 'url') {
+      modeUrlBtn.classList.add('active');
+      modeCodeBtn.classList.remove('active');
+      urlPanel.style.display = 'flex';
+      codePanel.style.display = 'none';
+      loadUrl();
+    } else {
+      modeCodeBtn.classList.add('active');
+      modeUrlBtn.classList.remove('active');
+      codePanel.style.display = 'flex';
+      urlPanel.style.display = 'none';
+      renderCode();
+    }
+    saveState();
+  }
+
+  modeUrlBtn.addEventListener('click', () => switchMode('url'));
+  modeCodeBtn.addEventListener('click', () => switchMode('code'));
+
+  addMenuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    addDropdownContent.classList.toggle('show');
+  });
+
+  window.addEventListener('click', () => addDropdownContent.classList.remove('show'));
+
+  function createCodeBox(type, labelText, initialValue = '') {
+    const boxDiv = document.createElement('div');
+    boxDiv.className = 'code-box';
+    boxDiv.dataset.type = type;
+
+    boxDiv.innerHTML = `
+      <div class="code-box-header">
+        <label>${labelText}</label>
+        <div class="box-actions">
+          <button class="box-btn clear-btn">Clear</button>
+          <button class="remove-box-btn" title="Delete box">×</button>
+        </div>
+      </div>
+      <div class="editor-wrapper">
+        <textarea spellcheck="false">${initialValue}</textarea>
+        <pre><code class="${getPrismClass(type)}"></code></pre>
+      </div>
+    `;
+
+    const textarea = boxDiv.querySelector('textarea');
+    const codeElem = boxDiv.querySelector('code');
+    const preElem = boxDiv.querySelector('pre');
+
+    function updateHighlight() {
+      let content = textarea.value;
+      if (content.endsWith('\n')) content += ' ';
+      
+      codeElem.textContent = content;
+      Prism.highlightElement(codeElem);
+      saveState();
+    }
+
+    textarea.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1) {
+        e.stopPropagation();
+      }
+    }, { passive: true });
+
+    textarea.addEventListener('scroll', () => {
+      preElem.scrollTop = textarea.scrollTop;
+      preElem.scrollLeft = textarea.scrollLeft;
+    });
+
+    textarea.addEventListener('input', updateHighlight);
+
+    boxDiv.querySelector('.clear-btn').addEventListener('click', () => {
+      textarea.value = '';
+      updateHighlight();
+    });
+
+    boxDiv.querySelector('.remove-box-btn').addEventListener('click', () => {
+      boxDiv.remove();
+      saveState();
+    });
+
+    codeBoxesContainer.appendChild(boxDiv);
+    updateHighlight();
+  }
+
+  addDropdownContent.querySelectorAll('button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const type = btn.dataset.type;
+      
+      if (type === 'html') createCodeBox('html', 'HTML', '<h1>Title</h1>');
+      else if (type === 'css') createCodeBox('css', 'CSS', 'h1 {\n  color: #2ec4b6;\n}');
+      else if (type === 'js') createCodeBox('js', 'JS', 'console.log("Hello World");');
+      else if (type === 'html-js') createCodeBox('html-js', 'HTML + JS', '<h1>Title</h1>\n<script>\n  alert("Hi");\n<\/script>');
+      else if (type === 'html-css') createCodeBox('html-css', 'HTML + CSS', '<h1>Title</h1>\n<style>\n  h1 { color: red; }\n<\/style>');
+      else if (type === 'css-js') createCodeBox('css-js', 'CSS + JS', '/* CSS */\nh1 { color: blue; }\n/* JS */\nconsole.log("Hi");');
+      else if (type === 'full') createCodeBox('full', 'HTML + CSS + JS', '<h1>Title</h1>\n<style>h1{color:red;}</style>\n<script>console.log("hi");<\/script>');
+      
+      addDropdownContent.classList.remove('show');
+    });
+  });
+
+  function loadUrl() {
+    let url = targetUrl.value.trim();
+    if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
+      url = 'https://' + url;
+      targetUrl.value = url;
+    }
+    iframe.removeAttribute('srcdoc');
+    iframe.src = url;
+  }
+
+  function renderCode() {
+    let htmlContent = '';
+    let cssContent = '';
+    let jsContent = '';
+    let mixedContent = '';
+
+    const boxes = codeBoxesContainer.querySelectorAll('.code-box');
+    boxes.forEach(box => {
+      const type = box.dataset.type;
+      const text = box.querySelector('textarea').value;
+      
+      if (type === 'html') htmlContent += text + '\n';
+      else if (type === 'css') cssContent += text + '\n';
+      else if (type === 'js') jsContent += text + '\n';
+      else mixedContent += text + '\n';
+    });
+
+    const combinedDoc = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <style>${cssContent}</style>
+      </head>
+      <body>
+        ${htmlContent}
+        ${mixedContent}
+        <script>${jsContent}<\/script>
+      </body>
+      </html>
+    `;
+
+    iframe.removeAttribute('src');
+    iframe.srcdoc = combinedDoc;
+  }
+
+  loadUrlBtn.addEventListener('click', () => { loadUrl(); saveState(); });
+  renderCodeBtn.addEventListener('click', () => { renderCode(); saveState(); });
+
+  targetUrl.addEventListener('input', saveState);
+  targetUrl.addEventListener('keypress', (e) => { if (e.key === 'Enter') loadUrl(); });
+
+  const loaded = loadState();
+  if (!loaded) {
+    createCodeBox('html-js', 'HTML + JS', '<h1>HTML + JS Box</h1>\n<button onclick="alert(\'Clicked!\')">Click Me</button>');
+    createCodeBox('css', 'CSS', 'body {\n  font-family: sans-serif;\n  padding: 20px;\n}\nh1 {\n  color: #2ec4b6;\n}');
+    loadUrl();
+  }
+
+  function updateInputs() {
+    inputWidth.value = Math.round(frame.offsetWidth);
+    inputHeight.value = Math.round(frame.offsetHeight);
+  }
+
+  function setFrameFromInputs() {
+    const w = Math.max(100, parseInt(inputWidth.value) || 100);
+    const h = Math.max(100, parseInt(inputHeight.value) || 100);
+    frame.style.width = w + 'px';
+    frame.style.height = h + 'px';
+    saveState();
+  }
+
+  inputWidth.addEventListener('input', setFrameFromInputs);
+  inputHeight.addEventListener('input', setFrameFromInputs);
+
+  // Resize Engine
+  let isDragging = false;
+  let startX, startY, startW, startH;
+  let animationFrameId = null;
+
+  function startResize(e) {
+    isDragging = true;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    startX = clientX;
+    startY = clientY;
+    startW = frame.offsetWidth;
+    startH = frame.offsetHeight;
+
+    overlay.style.display = 'block';
+  }
+
+  function doResize(e) {
+    if (!isDragging) return;
+
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+
+    animationFrameId = requestAnimationFrame(() => {
+      const newW = Math.max(100, startW + (clientX - startX) / currentZoom);
+      const newH = Math.max(100, startH + (clientY - startY) / currentZoom);
+
+      frame.style.width = newW + 'px';
+      frame.style.height = newH + 'px';
+
+      updateInputs();
+    });
+  }
+
+  function stopResize() {
+    if (isDragging) {
+      isDragging = false;
+      overlay.style.display = 'none';
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      saveState();
+    }
+  }
+
+  handle.addEventListener('mousedown', startResize);
+  window.addEventListener('mousemove', doResize);
+  window.addEventListener('mouseup', stopResize);
+
+  handle.addEventListener('touchstart', startResize);
+  window.addEventListener('touchmove', doResize);
+  window.addEventListener('touchend', stopResize);
+
+  presets.forEach(btn => {
+    btn.addEventListener('click', () => {
+      frame.style.width = btn.dataset.w + 'px';
+      frame.style.height = btn.dataset.h + 'px';
+      updateInputs();
+      saveState();
+    });
+  });
+
+  updateInputs();
+</script>
+
+</body>
+</html>
