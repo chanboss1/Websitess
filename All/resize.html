@@ -492,7 +492,11 @@
   <div class="workspace">
     <div class="preview-frame-wrapper" id="frameWrapper">
       <div class="preview-frame" id="previewFrame">
-        <iframe id="previewIframe"></iframe>
+        <iframe id="previewIframe"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+  allowfullscreen
+  referrerpolicy="strict-origin-when-cross-origin">
+</iframe>
         <div class="drag-overlay" id="overlay"></div>
         <div class="resize-handle" id="handle"></div>
       </div>
@@ -828,14 +832,26 @@ addDropdownContent.addEventListener('touchmove', (e) => {
   });
 
   function loadUrl() {
-    let url = targetUrl.value.trim();
-    if (url && !url.startsWith('http://') && !url.startsWith('https://')) {
-      url = 'https://' + url;
-      targetUrl.value = url;
-    }
-    iframe.removeAttribute('srcdoc');
-    iframe.src = url;
+  let url = targetUrl.value.trim();
+  if (!url) return;
+
+  // Add https if missing
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    url = 'https://' + url;
   }
+
+  // Auto-convert normal YouTube watch links to embed
+  // Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ
+  //       → https://www.youtube.com/embed/dQw4w9WgXcQ
+  const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+  if (ytMatch) {
+    url = `https://www.youtube.com/embed/${ytMatch[1]}`;
+  }
+
+  targetUrl.value = url;
+  iframe.removeAttribute('srcdoc');
+  iframe.src = url;
+}
 
   function renderCode() {
     let htmlContent = '';
